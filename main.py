@@ -6,9 +6,12 @@ def process_req(client_socket):
     try:
         request = client_socket.recv(1024).decode('utf-8').split('\r\n')
         request_line = request[0].split()
+        print('\n')
+        for line in request:
+            print(line)
 
         if len(request_line) < 3:
-            response = 'HTTP/1.1 400 Bad Request\n\nBad Request'
+            response = 'HTTP/1.1 400 Bad Request\r\n\r\nBad Request'
             client_socket.sendall(response.encode())
             client_socket.close()
             return
@@ -16,7 +19,7 @@ def process_req(client_socket):
         method, path, _ = request_line
 
         if method not in ['GET', 'HEAD']:
-            response = 'HTTP/1.1 400 Bad Request\n\nOnly GET and HEAD methods are supported.'
+            response = 'HTTP/1.1 400 Bad Request\r\n\r\nOnly GET and HEAD methods are supported.'
             client_socket.sendall(response.encode())
             client_socket.close()
             return
@@ -27,9 +30,9 @@ def process_req(client_socket):
         file_path = path[1:]  # Remove leading '/'
 
         if not os.path.isfile(file_path):
-            response = 'HTTP/1.1 404 Not Found\n\nFile Not Found'
+            response = 'HTTP/1.1 404 Not Found\r\n\r\nFile Not Found'
         elif not os.access(file_path, os.R_OK):
-            response = 'HTTP/1.1 403 Forbidden\n\nAccess Denied'
+            response = 'HTTP/1.1 403 Forbidden\r\n\r\nAccess Denied'
         else:
             last_modified = os.path.getmtime(file_path)
             last_modified_date = datetime.utcfromtimestamp(last_modified).strftime('%a, %d %b %Y %H:%M:%S GMT')
@@ -48,7 +51,7 @@ def process_req(client_socket):
             
             with open(file_path, 'r') as file:
                 content = file.read()
-            response = f'HTTP/1.1 200 OK\nLast-Modified: {last_modified_date}\n\n{content}'
+            response = f'HTTP/1.1 200 OK\r\nLast-Modified: {last_modified_date}\r\n\r\n{content}'
         
         client_socket.sendall(response.encode())
     except Exception as e:
