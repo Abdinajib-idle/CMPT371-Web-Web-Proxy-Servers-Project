@@ -43,11 +43,13 @@ def process_req(client_socket):
                     if_modified_since = header.split(' ', 1)[1]
                     break
 
-            if if_modified_since and if_modified_since == last_modified_date:
-                response = 'HTTP/1.1 304 Not Modified\n'
-                client_socket.sendall(response.encode())
-                client_socket.close()
-                return
+            if if_modified_since:
+                 if_modified_since_date = datetime.strptime(if_modified_since, '%a, %d %b %Y %H:%M:%S GMT')
+                 if if_modified_since_date >= datetime.strptime(last_modified_date, '%a, %d %b %Y %H:%M:%S GMT'):
+                    response = 'HTTP/1.1 304 Not Modified\n'
+                    client_socket.sendall(response.encode())
+                    client_socket.close()
+                    return
             
             with open(file_path, 'r') as file:
                 content = file.read()
