@@ -9,16 +9,22 @@ def handle_req():
 
 def main():
     proxy_socket = socket(AF_INET, SOCK_STREAM)
-    server_port = 12345
+    proxy_host = 12345
+    proxy_server_host = 'localhost'
+
+
+    server_host = 8080
+
     server_ip = 'localhost'
 
-    proxy_socket.bind((server_ip, server_port))
+    proxy_socket.bind((server_ip, proxy_host))
     proxy_socket.listen(5)
 
-    print("Proxy Server running on port: " + str(server_port))
+    print("Proxy Server running on port: " + str(proxy_host))
 
     while True:
         clientConn, addr = proxy_socket.accept()
+        print("conn received from {addr}")
         handle_req(clientConn)
 
 
