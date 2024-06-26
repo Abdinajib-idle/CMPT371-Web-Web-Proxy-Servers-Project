@@ -1,6 +1,9 @@
 from socket import *
 import threading
 
+# Cache to store responses
+cache = {}
+
 def handle_req(client_socket, server_host, server_port):
     try:
         # Receive the request from the client
@@ -17,24 +20,36 @@ def handle_req(client_socket, server_host, server_port):
             request_lines[0] = f"{request_line[0]} {path} {request_line[2]}"
         modified_request = '\r\n'.join(request_lines).encode('utf-8')
         
-        # Create server socket to connect to the target server
-        server_socket = socket(AF_INET, SOCK_STREAM)
-        server_socket.connect((server_host, server_port))
+        # Check if the response is in the cache
+        if path in cache:
+            print("Yay! Cache hit --> Serving from cache.")
+            client_socket.sendall(cache[path])
+        else:
+            print("Cache miss --> Forwarding request to the server.")
+            # Create server socket to connect to the target server
+            server_socket = socket(AF_INET, SOCK_STREAM)
+            server_socket.connect((server_host, server_port))
 
-        # Forward the modified request to the server
-        server_socket.sendall(modified_request)
+            # Forward the modified request to the server
+            server_socket.sendall(modified_request)
 
-        while True:
-            # Receive the response from the server
-            res = server_socket.recv(4096)
-            if len(res) > 0:
-                # Forward the response to the client
-                client_socket.sendall(res)
-            else:
-                break
+            response = b""
+            while True:
+                # Receive the response from the server
+                res = server_socket.recv(4096)
+                if len(res) > 0:
+                    response += res
+                else:
+                    break
 
-        # Termination of sockets
-        server_socket.close()
+            # Store the response in the cache
+            cache[path] = response
+
+            # Forward the response to the client
+            client_socket.sendall(response)
+
+            # Termination of sockets
+            server_socket.close()
         client_socket.close()
     except Exception as e:
         print(f"Proxy request error: {e}")
