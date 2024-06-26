@@ -1,6 +1,7 @@
 from socket import *
 import threading
-
+from datetime import datetime
+import os
 # Cache to store responses
 cache = {}
 
@@ -20,12 +21,29 @@ def handle_req(client_socket, server_host, server_port):
             request_lines[0] = f"{request_line[0]} {path} {request_line[2]}"
         modified_request = '\r\n'.join(request_lines).encode('utf-8')
         
+        # Extract the If-Modified-Since header if present
+        if_modified_since = None
+        for header in request_lines:
+            if header.startswith('If-Modified-Since:'):
+                if_modified_since = header.split(' ', 1)[1]
+                break
+        
         # Check if the response is in the cache
         if path in cache:
-            print("Yay! Cache hit --> Serving from cache.")
-            client_socket.sendall(cache[path])
+            cached_response, last_modified = cache[path]
+            if if_modified_since:
+                if_modified_since_date = datetime.strptime(if_modified_since, '%a, %d %b %Y %H:%M:%S GMT')
+                last_modified_date = datetime.strptime(last_modified, '%a, %d %b %Y %H:%M:%S GMT')
+                if if_modified_since_date >= last_modified_date:
+                    print("Cache hit with same modification time. Returning 304 Not Modified.")
+                    response = 'HTTP/1.1 304 Not Modified\r\n\r\n'
+                    client_socket.sendall(response.encode())
+                    client_socket.close()
+                    return
+            print("Cache hit. Serving from cache.")
+            client_socket.sendall(cached_response)
         else:
-            print("Cache miss --> Forwarding request to the server.")
+            print("Cache miss. Forwarding request to the server.")
             # Create server socket to connect to the target server
             server_socket = socket(AF_INET, SOCK_STREAM)
             server_socket.connect((server_host, server_port))
@@ -42,9 +60,18 @@ def handle_req(client_socket, server_host, server_port):
                 else:
                     break
 
-            # Store the response in the cache
-            cache[path] = response
-
+            # Extract Last-Modified header from server response
+            response_lines = response.decode('utf-8').split('\r\n')
+            last_modified = None
+            for header in response_lines:
+                if header.startswith('Last-Modified:'):
+                    last_modified = header.split(' ', 1)[1]
+                    break
+            
+            if last_modified:
+                # Store the response and last modified date in the cache
+                cache[path] = (response, last_modified)
+            
             # Forward the response to the client
             client_socket.sendall(response)
 
@@ -54,6 +81,7 @@ def handle_req(client_socket, server_host, server_port):
     except Exception as e:
         print(f"Proxy request error: {e}")
         client_socket.close()
+
 def main():
     proxy_socket = socket(AF_INET, SOCK_STREAM)
     proxy_host = 'localhost'
